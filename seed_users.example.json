@@ -1,0 +1,5 @@
+[
+  {"username":"admin","password":"ChangeMeNow!","department":"Admin","role":"admin"},
+  {"username":"vladimir","password":"ChangeMeNow!","department":"Negocios","role":"user"},
+  {"username":"lisaura","password":"ChangeMeNow!","department":"Legal","role":"user"}
+]
