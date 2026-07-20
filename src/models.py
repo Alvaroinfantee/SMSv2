@@ -91,4 +91,47 @@ class AuditLog(Base):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=lambda: dt.datetime.now(dt.timezone.utc))
 
 
+class AutomationRun(Base):
+    __tablename__ = "automation_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_key: Mapped[str] = mapped_column(String(160), unique=True, index=True)
+    campaign_type: Mapped[str] = mapped_column(String(40), index=True)
+    status: Mapped[str] = mapped_column(String(30), default="running", index=True)
+    fetched_count: Mapped[int] = mapped_column(Integer, default=0)
+    eligible_count: Mapped[int] = mapped_column(Integer, default=0)
+    sent_count: Mapped[int] = mapped_column(Integer, default=0)
+    failed_count: Mapped[int] = mapped_column(Integer, default=0)
+    skipped_count: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    started_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: dt.datetime.now(dt.timezone.utc)
+    )
+    finished_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AutomationEvent(Base):
+    __tablename__ = "automation_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_key: Mapped[str] = mapped_column(String(220), unique=True, index=True)
+    campaign_type: Mapped[str] = mapped_column(String(40), index=True)
+    customer_id: Mapped[str] = mapped_column(String(120), index=True)
+    loan_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True, index=True)
+    phone: Mapped[str] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(String(30), default="created", index=True)
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    campaign_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    message_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: dt.datetime.now(dt.timezone.utc)
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: dt.datetime.now(dt.timezone.utc),
+        onupdate=lambda: dt.datetime.now(dt.timezone.utc),
+    )
+
+
 Index("ix_sms_owner_campaign", SmsMessage.owner_user_id, SmsMessage.campaign_id)
+Index("ix_automation_event_customer_type", AutomationEvent.customer_id, AutomationEvent.campaign_type)
