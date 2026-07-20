@@ -5,7 +5,7 @@ import os
 from functools import lru_cache
 from typing import Iterable, Optional
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -26,7 +26,19 @@ def get_engine() -> Engine:
     sqlite_path = settings.sqlite_path
     # Ensure directory exists
     os.makedirs(os.path.dirname(sqlite_path) or ".", exist_ok=True)
-    return create_engine(f"sqlite:///{sqlite_path}", connect_args={"check_same_thread": False})
+    engine = create_engine(
+        f"sqlite:///{sqlite_path}",
+        connect_args={"check_same_thread": False, "timeout": 30},
+    )
+
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragmas(dbapi_connection, _connection_record) -> None:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=30000")
+        cursor.close()
+
+    return engine
 
 
 @lru_cache(maxsize=1)
