@@ -17,11 +17,8 @@ Integra:
 
 - Python 3.10+ (recomendado 3.11)
 - Credenciales Lleida.net:
-  - `LLEIDA_USER`
-  - `LLEIDA_SMS_API_KEY` (API Key del servicio **Send SMS**)
-  - `LLEIDA_MESSAGES_API_KEY` (API Key del servicio **Messages**)
-
-Lleida.net suele requerir **API Keys distintas por servicio** (Send SMS vs Messages).
+  - `SMS_API_USER`
+  - `SMS_API_PASSWORD`
 
 ---
 
@@ -48,9 +45,8 @@ Por defecto, si no existe base de datos, se usa SQLite en `./data/app.db`.
 
 ### Obligatorias (para enviar y consultar estado)
 
-- `LLEIDA_USER`
-- `LLEIDA_SMS_API_KEY`
-- `LLEIDA_MESSAGES_API_KEY`
+- `SMS_API_USER`
+- `SMS_API_PASSWORD`
 
 ### Recomendadas
 
@@ -69,7 +65,7 @@ Ejemplo `SEED_USERS_JSON`:
 
 ### Opcionales
 
-- `LLEIDA_API_BASE_URL` (default `https://api.lleida.net/`)
+- `SMS_API_URL` (default `https://api.lleida.net/sms/v2/`)
 - `MAX_BULK_ROWS` (default `5000`)
 - `DEFAULT_SENDER` (default vacío)
 - `AUTO_SEED_USERS` (default `true`) — si lo pones `false`, no crea usuarios por defecto.
@@ -101,13 +97,12 @@ En DigitalOcean App Platform:
 2) En el componente, configura el **Run Command** como:
 
 ```bash
-streamlit run app.py --server.address 0.0.0.0 --server.port $PORT
+python -m src.service
 ```
 
 3) Configura las **Environment Variables**:
-- `LLEIDA_USER`
-- `LLEIDA_SMS_API_KEY`
-- `LLEIDA_MESSAGES_API_KEY`
+- `SMS_API_USER`
+- `SMS_API_PASSWORD`
 - (opcional) `DATABASE_URL`
 - (opcional) `SEED_USERS_JSON`
 
@@ -120,3 +115,70 @@ streamlit run app.py --server.address 0.0.0.0 --server.port $PORT
 - Cambia contraseñas por defecto (o usa `SEED_USERS_JSON` con contraseñas fuertes).
 - No subas credenciales a Git.
 - Si vas a restringir por red (VPC / IPs), hazlo en DigitalOcean; la app no aplica filtros por IP.
+
+---
+
+## 7) Elegibilidad de clientes y campañas automáticas
+
+La sección **Clientes SMS** permite consultar tres listas desde la API interna:
+
+- Clientes autorizados para recibir SMS.
+- Clientes con préstamos que finalizan dentro de la ventana configurada.
+- Clientes morosos.
+
+La integración falla de forma segura: un cliente solo se considera elegible cuando
+la API devuelve de forma explícita un campo de autorización SMS verdadero. También
+se respeta cualquier campo de opt-out.
+
+### API de clientes
+
+Configura una URL base o URLs independientes:
+
+- `CUSTOMER_API_BASE_URL`
+- `CUSTOMER_API_ELIGIBLE_URL`
+- `CUSTOMER_API_LOAN_ENDING_URL`
+- `CUSTOMER_API_DELINQUENT_URL`
+
+Autenticación opcional:
+
+- `CUSTOMER_API_TOKEN` — se envía como Bearer token.
+- `CUSTOMER_API_KEY`
+- `CUSTOMER_API_KEY_HEADER` — default `X-API-Key`.
+- `CUSTOMER_API_HEADERS_JSON` — objeto JSON con headers adicionales.
+- `CUSTOMER_API_TIMEOUT_S` — default `30`.
+- `CUSTOMER_API_VERIFY_SSL` — default `true`.
+
+Si solo se configura `CUSTOMER_API_BASE_URL`, la app consulta:
+
+- `/sms/eligible`
+- `/sms/loan-ending?days=30`
+- `/sms/delinquent?min_days=1`
+
+La respuesta puede ser una lista o un objeto que contenga `data`, `results`,
+`items`, `customers`, `clientes` o `records`. Se reconocen nombres de campos
+comunes en inglés y español, por ejemplo `customer_id`/`cliente_id`,
+`phone`/`telefono`, `sms_allowed`/`sms_autorizado`,
+`loan_end_date`/`fecha_fin_prestamo` y `days_past_due`/`dias_mora`.
+
+### Envío automático
+
+El mismo contenedor ejecuta un worker liviano, por lo que no añade otro componente
+de App Platform. Variables:
+
+- `AUTO_SMS_ENABLED` — default `false`.
+- `AUTOMATION_TIMEZONE` — default `America/Santo_Domingo`.
+- `AUTOMATION_HOUR` — hora local diaria, default `9`.
+- `AUTOMATION_USERNAME` — usuario propietario de las campañas, default `admin`.
+- `LOAN_ENDING_DAYS` — default `30`.
+- `DELINQUENT_MIN_DAYS` — default `1`.
+- `LOAN_ENDING_SMS_TEMPLATE`
+- `DELINQUENT_SMS_TEMPLATE`
+
+Las plantillas aceptan `{name}`, `{customer_id}`, `{loan_id}`,
+`{loan_end_date}` y `{days_past_due}`.
+
+La automatización registra una clave única por cliente y episodio de préstamo para
+evitar duplicados. Por esa razón, antes de activar `AUTO_SMS_ENABLED=true` se
+requiere un `DATABASE_URL` persistente. SQLite en App Platform es efímero; el
+worker se negará a enviar automáticamente con SQLite salvo que se establezca de
+forma explícita `ALLOW_EPHEMERAL_AUTOMATION=true`.
